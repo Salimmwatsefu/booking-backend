@@ -1,4 +1,26 @@
 from . import db
+from flask_bcrypt import Bcrypt
+from datetime import datetime
+
+bcrypt = Bcrypt()
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    phone = db.Column(db.String(20), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def __init__(self, email, phone, password):
+        self.email = email
+        self.phone = phone
+        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+
+    def check_password(self, password):
+        return bcrypt.check_password_hash(self.password_hash, password)
+
+    def __repr__(self):
+        return f"<User {self.email}>"
 
 class TransportInside(db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -1,10 +1,81 @@
 from flask import request, jsonify, Blueprint
-from datetime import datetime
+from datetime import datetime, timedelta
 from . import db
-from .models import TransportInside, TransportOutside, VenueBooking, SportsPitchBooking, Appointment
+from .models import TransportInside, TransportOutside, VenueBooking, SportsPitchBooking, Appointment, User
+import jwt
 
-# Create a Blueprint for all booking-related routes
 booking_blueprint = Blueprint('booking', __name__)
+
+SECRET_KEY = "sj12345"  # Replace with a secure secret key
+
+def create_token(user_id):
+    payload = {
+        "user_id": user_id,
+        "exp": datetime.utcnow() + timedelta(hours=24),  # Token expiry time
+        "iat": datetime.utcnow()
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+
+@booking_blueprint.route('/api/signup', methods=['POST'])
+def sign_up():
+    data = request.get_json()
+
+    # Extract data
+    email = data.get('email')
+    phone = data.get('phone')
+    password = data.get('password')
+
+    # Check for required fields
+    if not all([email, phone, password]):
+        return jsonify({"error": "All fields are required"}), 400
+
+    # Check if the email already exists
+    existing_user = User.query.filter_by(email=email).first()
+    if existing_user:
+        return jsonify({"error": "Email is already registered"}), 400
+
+    # Create and save the new user
+    new_user = User(email=email, phone=phone, password=password)
+    db.session.add(new_user)
+    db.session.commit()
+
+    # Generate a token for the new user
+    token = create_token(new_user.id)
+
+    return jsonify({
+        "message": "Account created successfully",
+        "user_id": new_user.id,
+        "token": token
+    }), 201
+
+
+# Login Route
+@booking_blueprint.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+
+    # Extract data
+    email = data.get('email')
+    password = data.get('password')
+
+    # Validate inputs
+    if not all([email, password]):
+        return jsonify({"error": "Email and password are required"}), 400
+
+    # Check if the user exists
+    user = User.query.filter_by(email=email).first()
+    if not user or not user.check_password(password):
+        return jsonify({"error": "Invalid email or password"}), 401
+
+    # Generate a token for the user
+    token = create_token(user.id)  # Assuming create_token generates a JWT
+
+    return jsonify({
+        "message": "Login successful",
+        "user_id": user.id,
+        "token": token
+    }), 200
+
 
 # Routes for Transport Inside School
 @booking_blueprint.route('/api/transport/inside', methods=['POST'])
